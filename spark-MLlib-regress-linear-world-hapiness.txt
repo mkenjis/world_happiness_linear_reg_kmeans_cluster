@@ -1,0 +1,85 @@
+val rdd = sc.textFile("world_happiness/world_happiness_report_2015.csv").map( x => x.split(","))
+
+val rdd1 = rdd.map( x => x.slice(3,x.size).map( x => x.toDouble))
+
+rdd1.first
+
+import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.mllib.regression.LabeledPoint
+
+val data = rdd1.map( x => {
+   val arr_size = x.size
+   val l = x(0)
+   val f = x.slice(1,arr_size)
+   LabeledPoint(l,Vectors.dense(f))
+ })
+ 
+val sets = data.randomSplit(Array(0.8,0.2))
+val trainSet = sets(0)
+val testSet = sets(1)
+
+trainSet.cache
+
+import org.apache.spark.mllib.regression.LinearRegressionWithSGD
+val model = LinearRegressionWithSGD.train(trainSet, 200, 1.0)
+----
+val alg = new LinearRegressionWithSGD()
+alg.setIntercept(true)
+alg.optimizer.setNumIterations(200)
+alg.optimizer.setStepSize(1.0)
+val model = alg.run(trainSet)
+
+val validPredicts = testSet.map(x => (model.predict(x.features),x.label))
+
+validPredicts.take(10)
+res6: Array[(Double, Double)] = Array((7.129790569919578,7.527), (7.054873282221115,7.427), (7.014177171985721,7.378), (6.9274823075162155,7.119), (6.620842620749676,6.75), (6.5377705319623605,6.505), (6.014573151988882,5.96), (5.633094570465198,5.828), (5.897888973427993,5.791), (5.601302281182321,5.589))
+
+import org.apache.spark.mllib.evaluation.RegressionMetrics
+val validMetrics = new RegressionMetrics(validPredicts)
+validMetrics.rootMeanSquaredError  // 0.2151813799927995
+validMetrics.meanSquaredError  // 0.04630302629560557
+
+-------------------------
+
+val vect = rdd1.map( x => Vectors.dense(x(1),x(2),x(3),x(4),x(5),x(6),x(7),x(8),x(0)))
+
+import org.apache.spark.mllib.linalg.Matrix
+import org.apache.spark.mllib.linalg.distributed.RowMatrix
+val matrix = new RowMatrix(vect)
+val colstats = matrix.computeColumnSummaryStatistics
+
+colstats.min
+res16: org.apache.spark.mllib.linalg.Vector = [0.01848,0.0,0.0,0.0,0.0,0.0,0.0,0.32858,2.839]
+
+colstats.max
+res17: org.apache.spark.mllib.linalg.Vector = [0.13693,1.69042,1.40223,1.02525,0.66973,0.55191,0.79588,3.60214,7.587]
+
+colstats.mean
+res19: org.apache.spark.mllib.linalg.Vector = [0.04788474683544302,0.8461372151898745,0.9910459493670879,0.6302593670886076,0.4286149367088608,0.14342183544303796,0.23729550632911395,2.098976772151899,5.3757341772151905]
+
+val colsims = matrix.columnSimilarities()
+val mat1 = colsims.toRowMatrix
+
+import org.apache.spark.mllib.linalg.distributed.MatrixEntry
+val transformedRDD = colsims.entries.map{case MatrixEntry(row: Long, col:Long, sim:Double) => ((row,col),sim)}
+
+val rep = transformedRDD.sortBy(_._1).map(x => ((x._1._1,x._1._2),x._2))
+
+var i = -1.0
+
+rep.foreach( x => {
+  val sim = x._2
+  if (x._1._1 != i) { println
+    print(f"$sim%.4f ")
+    i = x._1._1
+  } else print(f"$sim%.4f ")
+})
+
+0.8193 0.8976 0.8392 0.8744 0.6848 0.8174 0.9180 0.9089
+0.9443 0.9688 0.9050 0.7782 0.7953 0.8780 0.9532
+0.9494 0.9488 0.7754 0.8623 0.9427 0.9841
+0.9224 0.7731 0.8407 0.9026 0.9658
+0.8292 0.8912 0.9180 0.9622
+0.7610 0.7372 0.8037
+0.8417 0.8811
+0.9741

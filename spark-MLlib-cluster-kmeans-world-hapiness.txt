@@ -1,0 +1,160 @@
+val rdd = sc.textFile("world_happiness/world_happiness_report_2015.csv").map( x => x.split(","))
+
+val rdd1 = rdd.map( x => x.slice(3,x.size).map( x => x.toDouble))
+
+rdd1.first
+
+import org.apache.spark.mllib.linalg.Vectors
+
+// remove the target variable x(0) from vect.
+val vect = rdd1.map( x => Vectors.dense(x(1),x(2),x(3),x(4),x(5),x(6),x(7),x(8)))
+
+vect.first
+
+import org.apache.spark.mllib.clustering.KMeans
+val numClusters = 5
+val numIterations = 10
+val numRuns = 3
+
+val clsmodel = KMeans.train(vect, numClusters,numIterations, numRuns)
+
+val predictions = clsmodel.predict(vect);
+
+predictions.take(10)
+res17: Array[Int] = Array(4, 4, 4, 4, 4, 4, 4, 4, 4, 4)
+
+// function to compute distance between 2 featured points
+import breeze.linalg._
+import breeze.numerics.pow
+def computeDistance(v1: DenseVector[Double], v2: DenseVector[Double]) = pow(v1 - v2, 2).sum
+
+val rdd2 = rdd.zip(vect)
+
+val cls_dist = rdd2.map{ case (x,y) => {
+   val pred = clsmodel.predict(y)
+   val cls_centre = clsmodel.clusterCenters(pred)
+   val dist = computeDistance(DenseVector(cls_centre.toArray),DenseVector(y.toArray))
+   (x(0),x(1),pred,dist)
+ }}
+
+val cls_assign = cls_dist.groupBy{case(country,continent,cluster,dist) => cluster}.collectAsMap
+
+for ((k,v) <- cls_assign.toSeq.sortBy(_._1)) {
+   println(s"Cluster $k:")
+   val m = v.toSeq.sortBy(_._4)
+   println(m.take(20).map { case (country,continent,_,d) => (continent,country,d) }.mkString("\n"))
+   println("=====\n")
+ }
+
+// predominantely african countries
+Cluster 0:
+(Southern Asia,Nepal,0.05461909256813272)
+(Middle East and Northern Africa,Yemen,0.057776304601466)
+(Sub-Saharan Africa,Comoros,0.06288675582368818)
+(Sub-Saharan Africa,Cameroon,0.07169332487368821)
+(Sub-Saharan Africa,Madagascar,0.08306199006813267)
+(Sub-Saharan Africa,Mauritania,0.08935996000702136)
+(Sub-Saharan Africa,Kenya,0.08944535862924402)
+(Sub-Saharan Africa,Chad,0.09577641703479922)
+(Sub-Saharan Africa,Djibouti,0.10140243081257694)
+(Central and Eastern Europe,Tajikistan,0.10466731827924361)
+(Sub-Saharan Africa,Niger,0.13664233621813263)
+(Sub-Saharan Africa,Mali,0.1441258843903551)
+(Sub-Saharan Africa,Congo (Brazzaville),0.1571765330125774)
+(Latin America and Caribbean,Honduras,0.16762981788479964)
+(Sub-Saharan Africa,Guinea,0.17865842222924347)
+(Southeastern Asia,Laos,0.17895264269591077)
+(Middle East and Northern Africa,Palestinian Territories,0.19218852035702155)
+(Latin America and Caribbean,Haiti,0.20778800604035458)
+(Sub-Saharan Africa,Ghana,0.22000668040146568)
+(Sub-Saharan Africa,Burkina Faso,0.22201470039591092)
+=====
+
+// predominantely european countries
+Cluster 1:
+(Western Europe,Germany,0.03229655680325955)
+(Western Europe,France,0.04036974162879137)
+(Latin America and Caribbean,Uruguay,0.06125117543942936)
+(Western Europe,Belgium,0.06772781301176993)
+(Western Europe,Spain,0.06887524015857867)
+(Eastern Asia,Taiwan,0.07526041916283374)
+(Middle East and Northern Africa,United Arab Emirates,0.08293306403517427)
+(Middle East and Northern Africa,Libya,0.08441024043942948)
+(Australia and New Zealand,Australia,0.09101175918411054)
+(Central and Eastern Europe,Slovakia,0.1033320362649615)
+(Central and Eastern Europe,Kazakhstan,0.10702192121602512)
+(Latin America and Caribbean,Trinidad and Tobago,0.10774064569049324)
+(Central and Eastern Europe,Belarus,0.11015409433730193)
+(Australia and New Zealand,New Zealand,0.11784295490325944)
+(Western Europe,Sweden,0.12239689132879128)
+(Western Europe,Ireland,0.13040472814794052)
+(Western Europe,United Kingdom,0.1368389502926213)
+(Middle East and Northern Africa,Oman,0.13892639255857817)
+(North America,United States,0.14262422427985505)
+(Western Europe,Netherlands,0.14588456200751465)
+=====
+
+// predominantely african countries
+Cluster 2:
+(Sub-Saharan Africa,Liberia,0.07652286492244903)
+(Sub-Saharan Africa,Zambia,0.08666137319387754)
+(Sub-Saharan Africa,Lesotho,0.1261872377795919)
+(Sub-Saharan Africa,Sierra Leone,0.1445080131081632)
+(Sub-Saharan Africa,Ethiopia,0.16171556143673443)
+(Sub-Saharan Africa,Zimbabwe,0.17353371429387737)
+(Sub-Saharan Africa,Nigeria,0.1859565427367349)
+(Sub-Saharan Africa,Congo (Kinshasa),0.20870711287959198)
+(Sub-Saharan Africa,Malawi,0.22695041726530615)
+(Sub-Saharan Africa,Mozambique,0.25720735063673494)
+(Southern Asia,Bangladesh,0.29445733109387734)
+(Sub-Saharan Africa,Swaziland,0.35596576827959187)
+(Southern Asia,Pakistan,0.49253225512244914)
+(Sub-Saharan Africa,Central African Republic,0.6732188403367346)
+=====
+
+// predominantely latin countries
+Cluster 3:
+(Latin America and Caribbean,Colombia,0.041250004874480266)
+(Latin America and Caribbean,Suriname,0.052289393409262724)
+(Latin America and Caribbean,Panama,0.05681903944404548)
+(Latin America and Caribbean,Argentina,0.061009284070132425)
+(Latin America and Caribbean,Peru,0.06455479111795853)
+(Latin America and Caribbean,Guatemala,0.06562083606578453)
+(Latin America and Caribbean,El Salvador,0.08073815624404518)
+(Latin America and Caribbean,Ecuador,0.10254307884839352)
+(Latin America and Caribbean,Chile,0.1042018265396978)
+(Latin America and Caribbean,Bolivia,0.1113259177049148)
+(Central and Eastern Europe,Czech Republic,0.13514937142665423)
+(Central and Eastern Europe,Kosovo,0.14703501824839302)
+(Central and Eastern Europe,Croatia,0.1700677789483931)
+(Latin America and Caribbean,Venezuela,0.20509334654404524)
+(Middle East and Northern Africa,Algeria,0.2091356262744804)
+(Latin America and Caribbean,Costa Rica,0.2129153620049149)
+(Central and Eastern Europe,Moldova,0.22354194696143637)
+(Latin America and Caribbean,Brazil,0.23316375399187103)
+(Middle East and Northern Africa,Israel,0.2560470640483931)
+(Latin America and Caribbean,Jamaica,0.2872007104310023)
+=====
+
+Cluster 4:
+(Central and Eastern Europe,Macedonia,0.05828115924058182)
+(Middle East and Northern Africa,Lebanon,0.07203253738795018)
+(Central and Eastern Europe,Latvia,0.07308982249847654)
+(Central and Eastern Europe,Ukraine,0.10120904530373963)
+(Middle East and Northern Africa,Egypt,0.12228284785637115)
+(Sub-Saharan Africa,Mauritius,0.12480692474058179)
+(Central and Eastern Europe,Estonia,0.14983612234584498)
+(Middle East and Northern Africa,Jordan,0.15014277498795028)
+(Southern Asia,Bhutan,0.16314682293005545)
+(Western Europe,North Cyprus,0.16559588366163439)
+(Latin America and Caribbean,Dominican Republic,0.17240070348795014)
+(Eastern Asia,China,0.1772395109984766)
+(Eastern Asia,Mongolia,0.1773935791247922)
+(Southeastern Asia,Philippines,0.17770944999847657)
+(Central and Eastern Europe,Armenia,0.181881208282687)
+(Central and Eastern Europe,Hungary,0.19132609455637123)
+(Central and Eastern Europe,Albania,0.19950192033005554)
+(Western Europe,Portugal,0.2140101488879501)
+(Central and Eastern Europe,Romania,0.21599671743531862)
+(Southeastern Asia,Indonesia,0.25439709811952926)
+=====
