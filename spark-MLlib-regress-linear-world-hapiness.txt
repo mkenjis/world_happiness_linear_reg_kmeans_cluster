@@ -1,3 +1,4 @@
+
 val rdd = sc.textFile("world_happiness/world_happiness_report_2015.csv").map( x => x.split(","))
 
 val rdd1 = rdd.map( x => x.slice(3,x.size).map( x => x.toDouble))
@@ -20,6 +21,7 @@ val testSet = sets(1)
 
 trainSet.cache
 
+---- MLlib logistic regression --------------
 import org.apache.spark.mllib.regression.LinearRegressionWithSGD
 val model = LinearRegressionWithSGD.train(trainSet, 200, 1.0)
 ----
@@ -32,12 +34,33 @@ val model = alg.run(trainSet)
 val validPredicts = testSet.map(x => (model.predict(x.features),x.label))
 
 validPredicts.take(10)
-res6: Array[(Double, Double)] = Array((7.129790569919578,7.527), (7.054873282221115,7.427), (7.014177171985721,7.378), (6.9274823075162155,7.119), (6.620842620749676,6.75), (6.5377705319623605,6.505), (6.014573151988882,5.96), (5.633094570465198,5.828), (5.897888973427993,5.791), (5.601302281182321,5.589))
+res6: Array[(Double, Double)] = Array((7.128668661003051,7.527), (7.109346649004852,7.278), (6.7883147632169045,6.946), (6.603731566439976,6.798), (6.552075365039732,6.574), (6.067416094800416,5.987), (5.877603749019901,5.824), (5.970908343780179,5.759), (5.780423776848055,5.689), (5.722046825576282,5.605))
 
 import org.apache.spark.mllib.evaluation.RegressionMetrics
 val validMetrics = new RegressionMetrics(validPredicts)
-validMetrics.rootMeanSquaredError  // 0.2151813799927995
-validMetrics.meanSquaredError  // 0.04630302629560557
+validMetrics.rootMeanSquaredError  // 0.2146084670916074
+validMetrics.meanSquaredError  // 0.04605679414740955
+
+---- MLlib decision tree regression --------------
+import org.apache.spark.mllib.tree.DecisionTree
+import org.apache.spark.mllib.tree.model.DecisionTreeModel
+
+val categoricalFeaturesInfo = Map[Int, Int]()
+val impurity = "variance"
+val maxDepth = 5
+val maxBins = 32
+
+val model = DecisionTree.trainRegressor(trainSet, categoricalFeaturesInfo, impurity, maxDepth, maxBins)
+
+val validPredicts = testSet.map(x => (model.predict(x.features),x.label))
+
+validPredicts.take(10)
+res9: Array[(Double, Double)] = Array((7.407888888888891,7.527), (6.27,7.278), (7.0322000000000005,6.946), (5.180923076923078,6.798), (6.8965,6.574), (5.474,5.987), (6.0306000000000015,5.824), (5.391500000000001,5.759), (5.180923076923078,5.689), (5.8188666666666675,5.605))
+
+import org.apache.spark.mllib.evaluation.RegressionMetrics
+val validMetrics = new RegressionMetrics(validPredicts)
+validMetrics.rootMeanSquaredError  // 0.6863887053994453
+validMetrics.meanSquaredError  // 0.4711294548999265
 
 -------------------------
 
