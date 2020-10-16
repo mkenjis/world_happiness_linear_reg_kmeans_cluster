@@ -22,9 +22,10 @@ val testSet = sets(1)
 trainSet.cache
 
 ---- MLlib logistic regression --------------
+
 import org.apache.spark.mllib.regression.LinearRegressionWithSGD
 val model = LinearRegressionWithSGD.train(trainSet, 200, 1.0)
-----
+
 val alg = new LinearRegressionWithSGD()
 alg.setIntercept(true)
 alg.optimizer.setNumIterations(200)
@@ -42,10 +43,11 @@ validMetrics.rootMeanSquaredError  // 0.2146084670916074
 validMetrics.meanSquaredError  // 0.04605679414740955
 
 ---- MLlib decision tree regression --------------
+
 import org.apache.spark.mllib.tree.DecisionTree
 import org.apache.spark.mllib.tree.model.DecisionTreeModel
 
-val categoricalFeaturesInfo = Map[Int, Int]()
+val categoricalFeaturesInfo = Map[Int, Int]()  // no categorical features in dataset
 val impurity = "variance"
 val maxDepth = 5
 val maxBins = 32
